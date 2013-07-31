@@ -362,8 +362,12 @@ newtRef PkgWriteFrame(pkg_stream_t *pkg, newtRefArg frame)
 	map_pos = PkgWriteObject(pkg, map);
 	PkgWriteU32(pkg, dst+8, map_pos);
 
+	newtObjRef obj = NewtRefToPointer(frame);
+	uint32_t index;
 	// now add all slots and fill in the rest of our chunk
 	for (i=0; i<n; i++) {
+		newtRefVar slotSym = NewtGetMapIndex(obj->as.map, i, &index);
+		printf("Slot %d = <%s>\n", i, NewtRefToSymbol(slotSym)->name);
 		slot = NewtGetFrameSlot(frame, i);
 		slot_pos = PkgWriteObject(pkg, slot);
 		PkgWriteU32(pkg, dst+12+4*i, slot_pos);
