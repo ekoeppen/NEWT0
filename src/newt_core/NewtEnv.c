@@ -151,6 +151,7 @@ void NewtInitSYM(void)
     INITSYM(bits);
     INITSYM(cbits);
     INITSYM(nativeModule);
+    INITSYM(code);
 
     // for loop
     INITSYM(collect);
