@@ -84,9 +84,11 @@ target_include_directories(libnewt PUBLIC
 	src/
 )
 
-if (ICONV_LIBRARY)
+target_link_libraries(libnewt PUBLIC dl)
+
+if (ICONV)
 	add_definitions (-DHAVE_LIBICONV)
-	target_link_libraries(libnewt PUBLIC ${ICONV})
+	target_link_libraries(libnewt PUBLIC ${ICONV_LIBRARY})
 endif()
 
 set_target_properties(libnewt
