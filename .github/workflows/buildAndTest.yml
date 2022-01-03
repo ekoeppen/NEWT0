@@ -1,0 +1,68 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-gcc
+            os: ubuntu-latest
+            compiler: gcc
+          - name: ubuntu-mingw
+            os: ubuntu-latest
+            compiler: mingw
+            toolchain: cmake/toolchain-mingw.cmake
+          - name: macos-clang
+            os: macos-latest
+            compiler: clang
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake flex bison
+        if [ "${{ matrix.name }}" = "ubuntu-mingw" ]; then
+          sudo apt-get install -y mingw-w64
+        fi
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: brew install cmake flex bison
+
+    - name: Configure CMake
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          ${{ matrix.toolchain && format('-DCMAKE_TOOLCHAIN_FILE={0}', matrix.toolchain) || '' }}
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run Core Tests
+      # Only run tests on native builds (not cross-compiles)
+      if: matrix.toolchain == ''
+      run: |
+        cd build
+        ctest -L core --output-on-failure
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: newt-${{ matrix.os }}-${{ matrix.compiler }}
+        path: |
+          build/newt
+          build/newt.exe
+        if-no-files-found: ignore
