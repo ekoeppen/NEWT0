@@ -626,78 +626,83 @@ void PkgWritePart(pkg_stream_t *pkg, newtRefArg part)
  */
 void PkgReserveRelocations(newtRefArg package, pkg_stream_t *pkg)
 {
+	pkg->relocation_size = 0;
 	ssize_t ix = NewtFindSlotIndex(package, NSSYM(relocations));
-	if (ix >= 0) {
-		newtRef relocation_binary = NewtGetFrameSlot(package, ix);
-		uint32_t *relocations = (uint32_t *) NewtRefToBinary(relocation_binary);
-		size_t num_relocations = htonl(relocations[0]);
-		uint32_t num_pages = 2 + ((htonl(relocations[num_relocations]) - htonl(relocations[1])) / 1024);
-		pkg->relocation_size = PkgAlign(pkg, sizeof(relocation_header_t) + num_pages * (sizeof(relocation_set_t) + 4)
-			+ num_relocations);
-		PkgMakeRoom(pkg, pkg->directory_size, pkg->relocation_size);
-	} else {
-		pkg->relocation_size = 0;
+	if (ix < 0) {
+		return;
 	}
+	newtRef relocation_binary = NewtGetFrameSlot(package, ix);
+	if (relocation_binary == kNewtRefUnbind || relocation_binary == kNewtRefNIL) {
+		return;
+	}
+	uint32_t *relocations = (uint32_t *) NewtRefToBinary(relocation_binary);
+	size_t num_relocations = htonl(relocations[0]);
+	uint32_t num_pages = 2 + ((htonl(relocations[num_relocations]) - htonl(relocations[1])) / 1024);
+	pkg->relocation_size = PkgAlign(pkg, sizeof(relocation_header_t) + num_pages * (sizeof(relocation_set_t) + 4)
+		+ num_relocations);
+	PkgMakeRoom(pkg, pkg->directory_size, pkg->relocation_size);
 }
 
 void PkgUpdateRelocations(newtRefArg package, pkg_stream_t *pkg)
 {
 	ssize_t ix = NewtFindSlotIndex(package, NSSYM(relocations));
-	if (ix >= 0) {
-		newtRef relocation_binary = NewtGetFrameSlot(package, ix);
-		uint32_t *relocations = (uint32_t *) NewtRefToBinary(relocation_binary);
-		size_t num_relocations = htonl(relocations[0]);
-		uint32_t num_pages;
-		relocation_header_t header;
-		relocation_set_t reloc_set;
-		uint8_t reloc_data[256];
-		size_t num_reloc_data;
-		uint32_t page_number;
-		uint32_t reloc_sets_size;
+	if (ix < 0) {
+		return;
+	}
+	newtRef relocation_binary = NewtGetFrameSlot(package, ix);
+	if (relocation_binary == kNewtRefUnbind || relocation_binary == kNewtRefNIL) {
+		return;
+	}
+	uint32_t *relocations = (uint32_t *) NewtRefToBinary(relocation_binary);
+	size_t num_relocations = htonl(relocations[0]);
+	uint32_t num_pages;
+	relocation_header_t header;
+	relocation_set_t reloc_set;
+	uint8_t reloc_data[256];
+	size_t num_reloc_data;
+	uint32_t page_number;
+	uint32_t reloc_sets_size;
 
-		num_reloc_data = 0;
-		reloc_sets_size = 0;
-		num_pages = 0;
-		memset (reloc_data, 0, sizeof(reloc_data));
-		page_number = (htonl(relocations[1]) + pkg->code_offset) / 1024;
-		for (size_t i = 0; i < num_relocations; i++) {
-			uint32_t pkg_reloc = htonl(relocations[i + 1]) + pkg->code_offset;
-			if (pkg_reloc / 1024 != page_number) {
-				printf ("New page: %04x %04x %04x %d\n", page_number, pkg_reloc / 1024, pkg_reloc, reloc_sets_size);
-				reloc_set.offset_count = htons(num_reloc_data);
-				reloc_set.page_number = htons(page_number);
-				PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size,
-						&reloc_set, sizeof(reloc_set));
-				PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size + sizeof(reloc_set),
-						reloc_data, num_reloc_data);
-				reloc_sets_size += sizeof(reloc_set) + num_reloc_data;
-				reloc_sets_size = (reloc_sets_size + 3) & ~3;
-				num_reloc_data = 0;
-				memset (reloc_data, 0, sizeof(reloc_data));
-				page_number = pkg_reloc / 1024;
-				num_pages++;
-			}
-			reloc_data[num_reloc_data++] = (pkg_reloc - page_number * 1024) / 4;
-		}
-		if (num_reloc_data > 0) {
-			printf ("Finishing page: %04x, offset %u count %zu\n", page_number, reloc_sets_size, num_reloc_data);
+	num_reloc_data = 0;
+	reloc_sets_size = 0;
+	num_pages = 0;
+	memset (reloc_data, 0, sizeof(reloc_data));
+	page_number = (htonl(relocations[1]) + pkg->code_offset) / 1024;
+	for (size_t i = 0; i < num_relocations; i++) {
+		uint32_t pkg_reloc = htonl(relocations[i + 1]) + pkg->code_offset;
+		if (pkg_reloc / 1024 != page_number) {
+			printf ("New page: %04x %04x %04x %d\n", page_number, pkg_reloc / 1024, pkg_reloc, reloc_sets_size);
 			reloc_set.offset_count = htons(num_reloc_data);
 			reloc_set.page_number = htons(page_number);
 			PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size,
 					&reloc_set, sizeof(reloc_set));
 			PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size + sizeof(reloc_set),
 					reloc_data, num_reloc_data);
+			reloc_sets_size += sizeof(reloc_set) + num_reloc_data;
+			reloc_sets_size = (reloc_sets_size + 3) & ~3;
+			num_reloc_data = 0;
+			memset (reloc_data, 0, sizeof(reloc_data));
+			page_number = pkg_reloc / 1024;
 			num_pages++;
 		}
-		header.reserved = 0;
-		header.relocation_size = htonl(pkg->relocation_size);
-		header.page_size = htonl(0x400);
-		header.num_entries = htonl(num_pages);
-		header.base_address = htonl(65536 - pkg->code_offset);
-		PkgWriteData(pkg, pkg->header_size + pkg->var_data_size,
-				&header, sizeof(header));
-
+		reloc_data[num_reloc_data++] = (pkg_reloc - page_number * 1024) / 4;
 	}
+	if (num_reloc_data > 0) {
+		printf ("Finishing page: %04x, offset %u count %zu\n", page_number, reloc_sets_size, num_reloc_data);
+		reloc_set.offset_count = htons(num_reloc_data);
+		reloc_set.page_number = htons(page_number);
+		PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size,
+				&reloc_set, sizeof(reloc_set));
+		PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size + sizeof(reloc_set),
+				reloc_data, num_reloc_data);
+		num_pages++;
+	}
+	header.reserved = 0;
+	header.relocation_size = htonl(pkg->relocation_size);
+	header.page_size = htonl(0x400);
+	header.num_entries = htonl(num_pages);
+	header.base_address = htonl(65536 - pkg->code_offset);
+	PkgWriteData(pkg, pkg->header_size + pkg->var_data_size, &header, sizeof(header));
 }
 /*------------------------------------------------------------------------*/
 /** Create a new binary object that contains the object tree in package format.
