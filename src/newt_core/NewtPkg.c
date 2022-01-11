@@ -674,9 +674,9 @@ void PkgUpdateRelocations(newtRefArg package, pkg_stream_t *pkg)
 			printf ("New page: %04x %04x %04x %d\n", page_number, pkg_reloc / 1024, pkg_reloc, reloc_sets_size);
 			reloc_set.offset_count = htons(num_reloc_data);
 			reloc_set.page_number = htons(page_number);
-			PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size,
+			PkgWriteData(pkg, pkg->directory_size + sizeof(header) + reloc_sets_size,
 					&reloc_set, sizeof(reloc_set));
-			PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size + sizeof(reloc_set),
+			PkgWriteData(pkg, pkg->directory_size + sizeof(header) + reloc_sets_size + sizeof(reloc_set),
 					reloc_data, num_reloc_data);
 			reloc_sets_size += sizeof(reloc_set) + num_reloc_data;
 			reloc_sets_size = (reloc_sets_size + 3) & ~3;
@@ -691,9 +691,9 @@ void PkgUpdateRelocations(newtRefArg package, pkg_stream_t *pkg)
 		printf ("Finishing page: %04x, offset %u count %zu\n", page_number, reloc_sets_size, num_reloc_data);
 		reloc_set.offset_count = htons(num_reloc_data);
 		reloc_set.page_number = htons(page_number);
-		PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size,
+		PkgWriteData(pkg, pkg->directory_size + sizeof(header) + reloc_sets_size,
 				&reloc_set, sizeof(reloc_set));
-		PkgWriteData(pkg, pkg->header_size + pkg->var_data_size + sizeof(header) + reloc_sets_size + sizeof(reloc_set),
+		PkgWriteData(pkg, pkg->directory_size + sizeof(header) + reloc_sets_size + sizeof(reloc_set),
 				reloc_data, num_reloc_data);
 		num_pages++;
 	}
@@ -702,7 +702,7 @@ void PkgUpdateRelocations(newtRefArg package, pkg_stream_t *pkg)
 	header.page_size = htonl(0x400);
 	header.num_entries = htonl(num_pages);
 	header.base_address = htonl(65536 - pkg->code_offset);
-	PkgWriteData(pkg, pkg->header_size + pkg->var_data_size, &header, sizeof(header));
+	PkgWriteData(pkg, pkg->directory_size, &header, sizeof(header));
 }
 /*------------------------------------------------------------------------*/
 /** Create a new binary object that contains the object tree in package format.
