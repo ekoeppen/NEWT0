@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------*/
 /**
  * @file	config.h
- * @brief   ƒRƒ“ƒtƒBƒOİ’è
+ * @brief   ï¿½Rï¿½ï¿½ï¿½tï¿½Bï¿½Oï¿½İ’ï¿½
  *
  * @author  M.Nukui
  * @date	2005-04-30
@@ -13,7 +13,7 @@
 #ifndef	CONFIG_H
 #define	CONFIG_H
 
-/* ƒ}ƒNƒ’è‹` */
+/* ï¿½}ï¿½Nï¿½ï¿½ï¿½ï¿½` */
 #undef HAVE_INTTYPES_H
 #define HAVE_STDINT_H 1
 #define HAVE_MEMORY_H 1
@@ -22,7 +22,7 @@
 #undef HAVE_MACHINE_ENDIAN_H
 #undef HAVE_TERMIOS_H 
 
-#define HAVE_LIBICONV 1
+#undef HAVE_LIBICONV
 #undef HAVE_DLOPEN
 #undef HAVE_MMAP
 #undef HAVE_CHDIR
