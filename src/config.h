@@ -27,7 +27,6 @@
 /* #undef HAVE_FFI_H */
 #define HAVE_GNU_LIB_NAMES_H 1
 
-#define HAVE_LIBICONV 1
 #define HAVE_DLOPEN 1
 #define HAVE_MMAP 1
 #define HAVE_CHDIR 1

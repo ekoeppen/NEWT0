@@ -27,9 +27,6 @@ esac
 
 
 # Checks for libraries.
-AC_SEARCH_LIBS(iconv_open, iconv)
-test "$ac_cv_search" != "no" && AC_DEFINE(HAVE_LIBICONV)
-
 HAVE_DLOPEN='no'
 AC_MSG_CHECKING(checking for dlopen)
 AC_TRY_LINK([

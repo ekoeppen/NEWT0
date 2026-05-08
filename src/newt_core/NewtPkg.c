@@ -115,10 +115,8 @@ typedef struct {
 	newtRefVar	instances;		///< rw array holding the previously generated instance of any ref per part
 	newtRefVar	precedents;		///< w  array referencing the instances array
 	newtErr		lastErr;		///< r  a way to return error from deep below
-#ifdef HAVE_LIBICONV
-	iconv_t		from_utf16;		///< r  strings in compatible packages are UTF16
-	iconv_t		to_utf16;		///< w  strings in compatible packages are UTF16
-#endif /* HAVE_LIBICONV */
+	newt_iconv_t	from_utf16;		///< r  strings in compatible packages are UTF16
+	newt_iconv_t	to_utf16;		///< w  strings in compatible packages are UTF16
 	size_t		code_offset;	///< rw native code block offset
 	pkg_relocation_t relocations;
 	uint32_t	relocation_size;
@@ -338,16 +336,14 @@ void PgkWriteVarData(pkg_stream_t *pkg, size_t offset, newtRefVar frame, newtRef
 		uint8_t *data = NewtRefToBinary(info);
 		pkg_info_ref_t info_ref;
 
-#		ifdef HAVE_LIBICONV
-			if (NewtRefIsString(info)) {
-				size_t buflen;
-				char *buf = NewtIconv(pkg->to_utf16, (const char*) data, size, &buflen);
-				if (buf) {
-					size = (uint32_t) buflen;
-					data = (uint8_t*) buf;
-				}
+		if (NewtRefIsString(info)) {
+			size_t buflen;
+			char *buf = NewtIconvConvert(pkg->to_utf16, (const char*) data, size, &buflen);
+			if (buf) {
+				size = (uint32_t) buflen;
+				data = (uint8_t*) buf;
 			}
-#		endif /* HAVE_LIBICONV */
+		}
 
 		info_ref.offset = htons(pkg->var_data_size);
 		info_ref.size = htons(size);
@@ -460,14 +456,12 @@ pkgNewtRef PkgWriteBinary(pkg_stream_t *pkg, newtRefArg obj)
 	if (NewtRefIsSymbol(obj)) {
 		size = (uint32_t) NewtSymbolLength(obj)+5; // remember the trailing zero!
 	} else if (NewtRefIsString(obj)) {
-#		ifdef HAVE_LIBICONV
-			size_t buflen;
-			char *buf = NewtIconv(pkg->to_utf16, (const char*) data, size, &buflen);
-			if (buf) {
-				size = (uint32_t) buflen;
-				data = (uint8_t*) buf;
-			}
-#		endif /* HAVE_LIBICONV */
+		size_t buflen;
+		char *buf = NewtIconvConvert(pkg->to_utf16, (const char*) data, size, &buflen);
+		if (buf) {
+			size = (uint32_t) buflen;
+			data = (uint8_t*) buf;
+		}
 	}
 	size += 12;
 
@@ -737,11 +731,9 @@ newtRef NewtWritePkg(newtRefArg package)
 	// setup pkg_stream_t
 	memset(&pkg, 0, sizeof(pkg));
 
-#	ifdef HAVE_LIBICONV
 	{	char *encoding = NewtDefaultEncoding();
-		pkg.to_utf16 = iconv_open("UTF-16BE", encoding);
+		pkg.to_utf16 = NewtIconvOpen("UTF-16BE", encoding);
 	}
-#	endif /* HAVE_LIBICONV */
 
 	// find the array of parts that we will write
 	ix = NewtFindSlotIndex(package, NSSYM(parts));
@@ -782,7 +774,7 @@ newtRef NewtWritePkg(newtRefArg package)
 		// the original file has this (c) message embedded
 		{	
 #ifdef _MSC_VER
-			char msg[] = "Newtonª ToolKit Package © 1992-1997, Apple Computer, Inc.";
+			char msg[] = "Newtonï¿½ ToolKit Package ï¿½ 1992-1997, Apple Computer, Inc.";
 #else
 			char msg[] = "Newtonï½ª ToolKit Package ï½© 1992-1997, Apple Computer, Inc.";
 #endif
@@ -815,9 +807,7 @@ newtRef NewtWritePkg(newtRefArg package)
 	if (pkg.data) 
 		free(pkg.data);
 
-#	ifdef HAVE_LIBICONV
-		iconv_close(pkg.to_utf16);
-#	endif /* HAVE_LIBICONV */
+	NewtIconvClose(pkg.to_utf16);
 
 	return result;
 }
@@ -915,13 +905,11 @@ newtRef PkgReadBinaryObject(pkg_stream_t *pkg, uint32_t p_obj)
 	} else if (klass==NSSYM0(string)) {
 		const char *src = (const char*) pkg->data + p_obj + 12;
 		int sze = size-12;
-#		ifdef HAVE_LIBICONV
-			size_t buflen;
-			char *buf = NewtIconv(pkg->from_utf16, src, sze, &buflen);
-			if (buf) {
-				result = NewtMakeString2(buf, buflen-1, true); // NewtMakeString2 appends another null
-			}
-#		endif /* HAVE_LIBICONV */
+		size_t buflen;
+		char *buf = NewtIconvConvert(pkg->from_utf16, src, sze, &buflen);
+		if (buf) {
+			result = NewtMakeString2(buf, buflen-1, true); // NewtMakeString2 appends another null
+		}
 		if (result==kNewtRefNIL)
 			result = NewtMakeString2(src, sze, true);
 	} else if (klass==NSSYM0(int32)) {
@@ -1170,13 +1158,11 @@ newtRef PkgReadVardataString(pkg_stream_t *pkg, pkg_info_ref_t *info_ref)
 	} else {
 		char *src = (char*) pkg->var_data + ntohs(info_ref->offset);
 		int size = ntohs(info_ref->size);
-#		ifdef HAVE_LIBICONV
-			size_t buflen;
-			char *buf = NewtIconv(pkg->from_utf16, src, size, &buflen);
-			if (buf) {
-				return NewtMakeString2(buf, buflen-1, true);
-			}
-#		endif /* HAVE_LIBICONV */
+		size_t buflen;
+		char *buf = NewtIconvConvert(pkg->from_utf16, src, size, &buflen);
+		if (buf) {
+			return NewtMakeString2(buf, buflen-1, true);
+		}
 		return NewtMakeString2(src, size, true);
 	}
 }
@@ -1278,17 +1264,14 @@ newtRef NewtReadPkg(uint8_t * data, size_t size)
 	}
 	pkg.part_headers = (pkg_part_t*)(data + sizeof(pkg_header_t));
 	pkg.var_data = data + sizeof(pkg_header_t) + pkg.num_parts*sizeof(pkg_part_t);
-#	ifdef HAVE_LIBICONV
+
 	{	char *encoding = NewtDefaultEncoding();
-		pkg.from_utf16 = iconv_open(encoding, "UTF-16BE");
+		pkg.from_utf16 = NewtIconvOpen(encoding, "UTF-16BE");
 	}
-#	endif /* HAVE_LIBICONV */
 
 	result = PkgReadHeader(&pkg);
 
-#	ifdef HAVE_LIBICONV
-		iconv_close(pkg.from_utf16);
-#	endif /* HAVE_LIBICONV */
+	NewtIconvClose(pkg.from_utf16);
 
 	return result;
 }
