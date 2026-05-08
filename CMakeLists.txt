@@ -66,10 +66,14 @@ bison_target(parser src/parser/newt.y ${CMAKE_CURRENT_BINARY_DIR}/y.tab.c)
 add_flex_bison_dependency(lexer parser)
 
 #
-# ---- newt library ---------------------------------------------------------
+# ---- iconv detection --------------------------------------------------------
 #
 
-find_library(ICONV iconv)
+find_package(Iconv)
+
+#
+# ---- newt library ---------------------------------------------------------
+#
 
 add_library(libnewt STATIC
 	${sources}
@@ -86,9 +90,9 @@ target_include_directories(libnewt PUBLIC
 
 target_link_libraries(libnewt PUBLIC dl)
 
-if (ICONV)
-	add_definitions (-DHAVE_LIBICONV)
-	target_link_libraries(libnewt PUBLIC ${ICONV_LIBRARY})
+if (Iconv_FOUND)
+	target_compile_definitions(libnewt PUBLIC HAVE_LIBICONV)
+	target_link_libraries(libnewt PUBLIC Iconv::Iconv)
 endif()
 
 set_target_properties(libnewt
@@ -108,10 +112,6 @@ install(DIRECTORY src/newt_core/incs/
 #
 add_executable(newt src/main.c)
 target_link_libraries(newt libnewt)
-
-if (ICONV_LIBRARY)
-	target_link_libraries(newt ${ICONV_LIBRARY})
-endif()
  
 #
 # ---- tests ------------------------------------------------------------------

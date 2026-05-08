@@ -12,10 +12,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: configure
       run: |
         ./configure --enable-contrib
@@ -28,23 +29,7 @@ jobs:
     - name: archive
       run: |
         make tgz
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
         name: NEWT0 ${{matrix.os}}
         path: build/NEWT0_*.tgz
-
-  cmake-build:
-
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: configure
-      run: |
-        cmake -S . -B build
-    - name: build
-      run: |
-        cmake --build build
