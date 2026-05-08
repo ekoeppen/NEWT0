@@ -102,3 +102,37 @@ install(TARGETS libnewt
 install(DIRECTORY src/newt_core/incs/
 	DESTINATION ${NEWT_INSTALL_PREFIX}include/newt
 )
+ 
+#
+# ---- newt executable ------------------------------------------------------
+#
+add_executable(newt src/main.c)
+target_link_libraries(newt libnewt)
+
+if (ICONV_LIBRARY)
+	target_link_libraries(newt ${ICONV_LIBRARY})
+endif()
+ 
+#
+# ---- tests ------------------------------------------------------------------
+#
+enable_testing()
+
+file(GLOB unit_test_files "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.newt")
+
+foreach(test_file ${unit_test_files})
+    get_filename_component(test_name ${test_file} NAME)
+    if(NOT test_name STREQUAL "test_common.newt")
+        set(test_target_name unit_${test_name})
+        add_test(NAME ${test_target_name}
+            COMMAND $<TARGET_FILE:newt> -C ${CMAKE_CURRENT_SOURCE_DIR}/tests ${test_name}
+        )
+
+        # Categorize tests based on their dependencies/purpose
+        if(test_name MATCHES "arithmetic|compile|exceptions|nsof")
+            set_tests_properties(${test_target_name} PROPERTIES LABELS "core")
+        else()
+            set_tests_properties(${test_target_name} PROPERTIES LABELS "other")
+        endif()
+    endif()
+endforeach()
