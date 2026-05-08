@@ -1,0 +1,309 @@
+DEBUG = # -g
+
+
+srcdir = ./src
+build = ./build
+ext = ./ext
+contrib = ./contrib
+utils = $(srcdir)/utils
+parser = $(srcdir)/parser
+core = $(srcdir)/newt_core
+objdir = $(build)/obj
+yytmp = $(objdir)/yytmp
+tardir = $(shell basename `pwd`)_$(shell uname)
+docdir = $(build)/html
+headerdir = $(core)/incs
+
+DESTROOT =
+CC = gcc
+YACC = bison -y -d
+LEX = flex
+DEFS = -DHAVE_CONFIG_H
+LIBS = 
+DLEXT = so
+EXEEXT = 
+LDIMPORT = 
+LDFLAGS = $(DEBUG) -O2  -rdynamic 
+LDSHARED = $(CC) -shared
+
+# declarations needed to creat a static library
+LIBCOMMAND    = /usr/bin/ar cr
+LIBEXT        = .a
+
+prefix = /usr/local
+exec_prefix = ${prefix}
+bindir = ${exec_prefix}/bin
+sitedir = ${prefix}/lib/newt0
+includedir = ${prefix}/include/newt0
+libdir = ${prefix}/lib
+
+VPATH = $(core)
+STRIP = strip -x
+CFLAGS = $(DEBUG) $(DEFS) -fPIC -O2 -pipe
+CPPFLAGS = -I. -I$(srcdir) -I$(core)/incs -I$(srcdir)/parser -I$(yytmp) 
+
+
+NEWT          = $(build)/newt$(EXEEXT)
+
+LIBNEWT       = $(build)/libnewt$(LIBEXT)
+
+MAINOBJ       = $(objdir)/main.o
+
+UTILSOBJS     = $(objdir)/endian_utils.o
+
+COREOBJS      = $(objdir)/NewtBC.o \
+                $(objdir)/NewtEnv.o \
+                $(objdir)/NewtFile.o \
+                $(objdir)/NewtFns.o \
+                $(objdir)/NewtGC.o \
+                $(objdir)/NewtIconv.o \
+                $(objdir)/NewtIO.o \
+                $(objdir)/NewtMem.o \
+                $(objdir)/NewtNSOF.o \
+                $(objdir)/NewtPkg.o \
+                $(objdir)/NewtObj.o \
+                $(objdir)/NewtParser.o \
+                $(objdir)/NewtPrint.o \
+                $(objdir)/NewtStr.o \
+                $(objdir)/NewtVM.o
+
+PARSEROBJS    = $(yytmp)/y.tab.o \
+                $(yytmp)/lex.yy.o \
+                $(objdir)/lookup_words.o
+
+NEWTLIBS      = $(ext)/protoFILE \
+                $(ext)/protoREGEX
+
+CONTRIBLIBS   = $(contrib)/inwt
+
+CONTRIBLIBS_OBJC = $(contrib)/NewtObjC
+
+CONTRIBLIBS_LIBFFI = $(contrib)/NativeCalls
+
+OBJS          = $(MAINOBJ) $(UTILSOBJS) $(PARSEROBJS) $(COREOBJS)
+
+LIBOBJS       = $(UTILSOBJS) $(PARSEROBJS) $(COREOBJS)
+
+HEADERS       = $(headerdir)/NewtBC.h \
+                $(headerdir)/NewtConf.h \
+                $(headerdir)/NewtCore.h \
+                $(headerdir)/NewtEnv.h \
+                $(headerdir)/NewtErrs.h \
+                $(headerdir)/NewtFile.h \
+                $(headerdir)/NewtFns.h \
+                $(headerdir)/NewtGC.h \
+                $(headerdir)/NewtIconv.h \
+                $(headerdir)/NewtIO.h \
+                $(headerdir)/NewtLib.h \
+                $(headerdir)/NewtMem.h \
+                $(headerdir)/NewtNSOF.h \
+                $(headerdir)/NewtObj.h \
+                $(headerdir)/NewtParser.h \
+                $(headerdir)/NewtPkg.h \
+                $(headerdir)/NewtPrint.h \
+                $(headerdir)/NewtStr.h \
+                $(headerdir)/NewtType.h \
+                $(headerdir)/NewtVM.h \
+                $(headerdir)/platform.h \
+                $(srcdir)/config.h
+
+######
+
+.c.o:
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+
+### all
+
+all: newt libnewt ext   
+
+### make directory
+
+$(build):
+	mkdir -p $@
+	
+
+$(objdir):
+	mkdir -p $@
+
+$(yytmp):
+	mkdir -p $@
+
+### newt
+
+newt: $(build) $(objdir) $(yytmp) $(NEWT) $(LDIMPORT)
+
+$(NEWT): $(OBJS)
+	$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LIBS) $(LIBS)
+
+
+### LIBNEWT static library
+
+libnewt: $(build) $(objdir) $(yytmp) $(LIBNEWT) $(LDIMPORT)
+
+$(LIBNEWT): $(LIBOBJS)
+	$(LIBCOMMAND) $@ $(LIBOBJS) 
+
+
+### MAIN
+
+$(MAINOBJ): $(srcdir)/main.c $(srcdir)/version.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/main.c
+
+
+### UTILITIES
+
+$(objdir)/endian_utils.o: $(utils)/endian_utils.c $(utils)/endian_utils.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $(utils)/endian_utils.c
+
+
+### PARSER
+
+$(yytmp)/y.tab.c $(yytmp)/y.tab.h: $(parser)/newt.y
+	$(YACC) -o $@ $(parser)/newt.y
+
+$(yytmp)/lex.yy.c: $(parser)/newt.l $(yytmp)/y.tab.h
+	$(LEX) -o$@ $(parser)/newt.l
+
+$(objdir)/lookup_words.o: $(parser)/lookup_words.c $(parser)/lookup_words.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $(parser)/lookup_words.c
+
+
+### CORE
+
+$(COREOBJS)::
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $(core)/$(*F).c
+
+
+### ext
+
+ext: $(NEWTLIBS)
+
+$(NEWTLIBS)::
+	$(MAKE) -C $@
+
+contrib_objc: $(CONTRIBLIBS_OBJC)
+contrib_libffi: $(CONTRIBLIBS_LIBFFI)
+contrib: $(CONTRIBLIBS)
+
+$(CONTRIBLIBS_OBJC)::
+	$(MAKE) -C $@
+
+$(CONTRIBLIBS_LIBFFI)::
+	$(MAKE) -C $@
+
+$(CONTRIBLIBS)::
+	$(MAKE) -C $@
+
+### strip (for win)
+
+strip:
+	$(STRIP) $(NEWT) $(build)/*.$(DLEXT)
+
+
+### ARCHIVE
+
+copy:
+	rm -rf $(build)/$(tardir)
+	mkdir -p $(build)/$(tardir)
+	cp $(NEWT) $(build)/$(tardir)
+	cp $(build)/*.$(DLEXT) $(build)/$(tardir)
+	cp -Rp COPYING README.* documents sample $(build)/$(tardir)
+
+
+tgz: copy
+	tar czf $(build)/$(tardir).tgz -C $(build) $(tardir)
+
+
+### DOCUMENT GENERATE
+
+doc:
+	rm -rf $(docdir)
+	mkdir -p $(docdir)
+	cd misc; doxygen doxygen.conf
+
+### INSTALL
+
+.PHONY : install install_ext install_contrib install_contrib_objc install_contrib_libffi
+
+install_ext::
+	@for subdir in $(NEWTLIBS); do \
+		(cd $$subdir && $(MAKE) install) || exit 1; \
+	done
+
+install_contrib::
+	@for subdir in $(CONTRIBLIBS); do \
+		(cd $$subdir && $(MAKE) install) || exit 1; \
+	done
+
+install_contrib_libffi::
+	@for subdir in $(CONTRIBLIBS_LIBFFI); do \
+		(cd $$subdir && $(MAKE) install) || exit 1; \
+	done
+
+install_contrib_objc::
+	@for subdir in $(CONTRIBLIBS_OBJC); do \
+		(cd $$subdir && $(MAKE) install) || exit 1; \
+	done
+
+install::
+	install -m 755 $(NEWT) $(DESTDIR)$(bindir)
+	install -m 644 $(LIBNEWT) $(DESTDIR)$(libdir)
+	install -d -m 755 $(DESTDIR)$(sitedir)
+	install -d -m 755 $(DESTDIR)$(includedir)
+	install -m 644 $(HEADERS) $(DESTDIR)$(includedir)
+	test "xext" = x || $(MAKE) install_ext
+	test "x" = x || $(MAKE) install_contrib
+	test "x" = x || $(MAKE) install_contrib_libffi
+	test "x" = x || $(MAKE) install_contrib_objc
+
+### TEST
+
+test_contrib::
+	@for subdir in $(CONTRIBLIBS); do \
+		(cd $$subdir && $(MAKE) test NEWT=$(PWD)/$(NEWT)) || exit 1; \
+	done
+
+test_contrib_libffi::
+	@for subdir in $(CONTRIBLIBS_LIBFFI); do \
+		(cd $$subdir && $(MAKE) test NEWT=$(PWD)/$(NEWT)) || exit 1; \
+	done
+
+test_contrib_objc::
+	@for subdir in $(CONTRIBLIBS_OBJC); do \
+		(cd $$subdir && $(MAKE) test NEWT=$(PWD)/$(NEWT)) || exit 1; \
+	done
+
+test:
+	$(NEWT) -C tests test_arithmetic.newt
+	$(NEWT) -C tests test_compile.newt
+	$(NEWT) -C tests test_exceptions.newt
+	test "x" = x || $(MAKE) test_contrib
+	test "x" = x || $(MAKE) test_contrib_libffi
+	test "x" = x || $(MAKE) test_contrib_objc
+	test "xext" = x || $(NEWT) -C tests test_protoFILE.newt
+	test "xext" = x || $(NEWT) -C tests test_protoREGEX.newt
+
+
+### CLEAN
+
+clean_contrib::
+	@for subdir in $(CONTRIBLIBS); do \
+		(cd $$subdir && $(MAKE) clean) || exit 1; \
+	done
+
+clean_contrib_libffi::
+	@for subdir in $(CONTRIBLIBS_LIBFFI); do \
+		(cd $$subdir && $(MAKE) clean) || exit 1; \
+	done
+
+clean_contrib_objc::
+	@for subdir in $(CONTRIBLIBS_OBJC); do \
+		(cd $$subdir && $(MAKE) clean) || exit 1; \
+	done
+
+clean:
+	rm -rf build/*
+	test "x" = x || $(MAKE) clean_contrib
+	test "x" = x || $(MAKE) clean_contrib_libffi
+	test "x" = x || $(MAKE) clean_contrib_objc
