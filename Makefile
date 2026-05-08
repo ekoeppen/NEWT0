@@ -278,6 +278,7 @@ test:
 	$(NEWT) -C tests test_arithmetic.newt
 	$(NEWT) -C tests test_compile.newt
 	$(NEWT) -C tests test_exceptions.newt
+	$(NEWT) -C tests test_nsof.newt
 	test "x" = x || $(MAKE) test_contrib
 	test "x" = x || $(MAKE) test_contrib_libffi
 	test "x" = x || $(MAKE) test_contrib_objc

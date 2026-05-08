@@ -18,11 +18,8 @@
 #include "NewtType.h"
 
 
-#ifdef HAVE_LIBICONV
-#include <iconv.h>
-
-
 /* マクロ */
+typedef intptr_t newt_iconv_t;
 
 
 /* 関数プロトタイプ */
@@ -32,7 +29,11 @@ extern "C" {
 #endif
 
 
-char *		NewtIconv(iconv_t cd, const char* src, size_t srclen, size_t* dstlenp);
+newt_iconv_t	NewtIconvOpen(const char *tocode, const char *fromcode);
+size_t			NewtIconv(newt_iconv_t cd, char **inbuf, size_t *inbytesleft, char **outbuf, size_t *outbytesleft);
+int				NewtIconvClose(newt_iconv_t cd);
+
+char *			NewtIconvConvert(newt_iconv_t cd, const char* src, size_t srclen, size_t* dstlenp);
 
 
 #ifdef __cplusplus
@@ -40,5 +41,4 @@ char *		NewtIconv(iconv_t cd, const char* src, size_t srclen, size_t* dstlenp);
 #endif
 
 
-#endif /* HAVE_LIBICONV */
 #endif /* NEWTICONV_H */
