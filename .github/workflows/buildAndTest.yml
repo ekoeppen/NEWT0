@@ -25,6 +25,9 @@ jobs:
           - name: macos-clang
             os: macos-latest
             compiler: clang
+          - name: windows-msvc
+            os: windows-latest
+            compiler: msvc
 
     steps:
     - uses: actions/checkout@v4
@@ -42,21 +45,35 @@ jobs:
       if: runner.os == 'macOS'
       run: brew install cmake flex bison
 
+    - name: Install dependencies (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        choco install winflexbison3
+        # winflexbison3 tools are in this directory
+        echo "/c/ProgramData/chocolatey/lib/winflexbison3/tools" >> $GITHUB_PATH
+        # Use the wrapper executables provided by the package which handle paths correctly
+        cp /c/ProgramData/chocolatey/lib/winflexbison3/tools/win_flex.exe /c/ProgramData/chocolatey/lib/winflexbison3/tools/flex.exe
+        cp /c/ProgramData/chocolatey/lib/winflexbison3/tools/win_bison.exe /c/ProgramData/chocolatey/lib/winflexbison3/tools/bison.exe
+
     - name: Configure CMake
+      shell: bash
       run: |
         cmake -B build \
           -DCMAKE_BUILD_TYPE=Release \
           ${{ matrix.toolchain && format('-DCMAKE_TOOLCHAIN_FILE={0}', matrix.toolchain) || '' }}
 
     - name: Build
-      run: cmake --build build
+      shell: bash
+      run: cmake --build build --config Release
 
     - name: Run Core Tests
       # Only run tests on native builds (not cross-compiles)
       if: matrix.toolchain == ''
+      shell: bash
       run: |
         cd build
-        ctest -L core --output-on-failure
+        ctest -C Release -L core --output-on-failure
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -65,4 +82,5 @@ jobs:
         path: |
           build/newt
           build/newt.exe
+          build/Release/newt.exe
         if-no-files-found: ignore

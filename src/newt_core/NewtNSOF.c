@@ -269,10 +269,15 @@ int32_t NSOFReadXlong(nsof_stream_t * nsof)
 
 	if (value == 0xff)
 	{
-		value  = NSOFReadByte(nsof) << 24;
-		value |= NSOFReadByte(nsof) << 16;
-		value |= NSOFReadByte(nsof) << 8;
-		value |= NSOFReadByte(nsof);
+		uint32_t b1 = NSOFReadByte(nsof);
+		uint32_t b2 = NSOFReadByte(nsof);
+		uint32_t b3 = NSOFReadByte(nsof);
+		uint32_t b4 = NSOFReadByte(nsof);
+
+		value  = (b1 << 24);
+		value |= (b2 << 16);
+		value |= (b3 << 8);
+		value |= b4;
 	}
 
 	return value;
@@ -1100,8 +1105,12 @@ newtRef NSOFReadNSOF(nsof_stream_t * nsof)
 			break;
 
 		case kNSOFUnicodeCharacter:
-			r = NewtMakeCharacter((uint32_t)NSOFReadByte(nsof) << 8 | NSOFReadByte(nsof));
+		{
+			uint32_t c1 = NSOFReadByte(nsof);
+			uint32_t c2 = NSOFReadByte(nsof);
+			r = NewtMakeCharacter((c1 << 8) | c2);
 			break;
+		}
 
 		case kNSOFBinaryObject:
 		case kNSOFString:
