@@ -28,6 +28,7 @@
 #include "NewtPrint.h"
 #include "NewtNSOF.h"
 #include "NewtPkg.h"
+#include "NewtType.h"
 
 
 /* 型宣言 */
@@ -702,9 +703,11 @@ newtRef NVMMakeFastFunctionArgFrame(newtRefArg fn)
     NewtSetFrameSlot(result, 1, kNewtRefNIL);
     NewtSetFrameSlot(result, 2, kNewtRefNIL);
 
-    // Other elements just don't have any name and will be accessed by position.
+    // We assign generic names to avoid empty keys
     for (argIndex = 0; argIndex < fnNumArgs + fnNumLocals; argIndex++) {
-         NewtSetArraySlot(argFrameMap, argIndex + 4, kNewtRefNIL);
+         char name[16];
+         snprintf(name, sizeof(name) - 1, "_var%d", (int)argIndex);
+         NewtSetArraySlot(argFrameMap, argIndex + 4, NewtMakeSymbol(name));
          NewtSetFrameSlot(result, argIndex + 3, kNewtRefNIL);
     }
 
