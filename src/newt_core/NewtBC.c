@@ -1221,9 +1221,12 @@ int16_t NBCGenTryPre(nps_syntax_node_t * stree, nps_node_t r)
                 break;
 
             case kNPSOnexceptionList:
-                numExcps = NBCGenTryPre(stree, node->op1)
-                            + NBCGenTryPre(stree, node->op2);
+            {
+                int16_t n1 = NBCGenTryPre(stree, node->op1);
+                int16_t n2 = NBCGenTryPre(stree, node->op2);
+                numExcps = n1 + n2;
                 break;
+            }
         }
     }
 
@@ -1267,9 +1270,12 @@ int16_t NBCGenTryPost(nps_syntax_node_t * stree, nps_node_t r,
                 break;
 
             case kNPSOnexceptionList:
-                numExcps = NBCGenTryPost(stree, node->op1, onexcpspP, ret)
-                            + NBCGenTryPost(stree, node->op2, onexcpspP, ret);
+            {
+                int16_t n1 = NBCGenTryPost(stree, node->op1, onexcpspP, ret);
+                int16_t n2 = NBCGenTryPost(stree, node->op2, onexcpspP, ret);
+                numExcps = n1 + n2;
                 break;
+            }
         }
     }
 

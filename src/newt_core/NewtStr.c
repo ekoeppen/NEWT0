@@ -395,7 +395,8 @@ newtRef NsStrPos(newtRefArg rcvr, newtRefArg haystack, newtRefArg needle, newtRe
   return NewtMakeInteger(match - s);
 }
 
-newtRef NsStrReplace(newtRefArg rcvr, newtRefArg string, newtRefArg substr, newtRefArg replacement, newtRefArg count) {
+newtRef NsStrReplace(newtRefArg rcvr, newtRefArg string_arg, newtRefArg substr, newtRefArg replacement, newtRefArg count) {
+  newtRefVar string = (newtRefVar)string_arg;
   const char *ins;    // the next insert point
   char *tmp;    // varies
   size_t len_rep;  // length of rep
@@ -443,7 +444,7 @@ newtRef NsStrReplace(newtRefArg rcvr, newtRefArg string, newtRefArg substr, newt
   }
   
   size_t mallocLen = strlen(orig) + (len_with - len_rep) * occurences + 1;
-  char *result = tmp = calloc(mallocLen, sizeof(char *));
+  char *result = tmp = calloc(mallocLen, sizeof(char));
   
   if (!tmp) {
     return NewtThrow(kNErrOutOfObjectMemory, rcvr);
@@ -461,7 +462,7 @@ newtRef NsStrReplace(newtRefArg rcvr, newtRefArg string, newtRefArg substr, newt
   }
   strcpy(tmp, orig);
 
-  NewtSetLength(string, strlen(result));
+  string = NewtSetLength(string, strlen(result));
   strcpy(NewtRefToData(string), result);
   free(result);
   
