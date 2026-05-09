@@ -10,23 +10,40 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install dependencies
+    - name: Install dependencies (Linux)
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake
+        sudo apt-get install -y cmake flex bison
+
+    - name: Install dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        choco install winflexbison3
+        # winflexbison3 tools are in this directory
+        echo "C:\ProgramData\chocolatey\lib\winflexbison3\tools" >> $GITHUB_PATH
+        # Use the wrapper executables provided by the package which handle paths correctly
+        cp C:\ProgramData\chocolatey\lib\winflexbison3\tools\win_flex.exe C:\ProgramData\chocolatey\lib\winflexbison3\tools\flex.exe
+        cp C:\ProgramData\chocolatey\lib\winflexbison3\tools\win_bison.exe C:\ProgramData\chocolatey\lib\winflexbison3\tools\bison.exe
 
     - name: Configure CMake
       run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
-      run: cmake --build build
+      run: cmake --build build --config Release
 
     - name: Run Core Tests
+      shell: bash
       run: |
         cd build
-        ctest -L core --output-on-failure
+        ctest -C Release -L core --output-on-failure

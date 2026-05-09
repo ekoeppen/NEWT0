@@ -77,12 +77,15 @@ add_library(libnewt STATIC
 target_include_directories(libnewt PUBLIC
 	$<$<PLATFORM_ID:Darwin>:  src/newt_core/incs/darwin >
 	$<$<PLATFORM_ID:Linux>:  src/newt_core/incs/linux >
+	$<$<PLATFORM_ID:Windows>: src/newt_core/incs/msvc >
 	src/newt_core/incs/
 	src/parser/
 	src/
 )
 
-target_link_libraries(libnewt PUBLIC dl)
+if(NOT WIN32)
+	target_link_libraries(libnewt PUBLIC dl)
+endif()
 
 set_target_properties(libnewt
 	PROPERTIES OUTPUT_NAME newt
@@ -100,6 +103,14 @@ install(DIRECTORY src/newt_core/incs/
 # ---- newt executable ------------------------------------------------------
 #
 add_executable(newt src/main.c)
+target_include_directories(newt PRIVATE
+	$<$<PLATFORM_ID:Darwin>:  src/newt_core/incs/darwin >
+	$<$<PLATFORM_ID:Linux>:  src/newt_core/incs/linux >
+	$<$<PLATFORM_ID:Windows>: src/newt_core/incs/msvc >
+	src/newt_core/incs/
+	src/parser/
+	src/
+)
 target_link_libraries(newt libnewt)
  
 #
