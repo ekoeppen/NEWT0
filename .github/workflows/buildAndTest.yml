@@ -15,35 +15,89 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+          - os: windows-latest
+            compiler: msvc
+          - os: windows-latest
+            compiler: mingw
 
     steps:
     - uses: actions/checkout@v4
     
+    # Linux Setup
     - name: Install dependencies (Linux)
-      if: runner.os == 'Linux'
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake flex bison
 
-    - name: Install dependencies (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        choco install winflexbison3
-        # winflexbison3 tools are in this directory
-        echo "C:\ProgramData\chocolatey\lib\winflexbison3\tools" >> $GITHUB_PATH
-        # Use the wrapper executables provided by the package which handle paths correctly
-        cp C:\ProgramData\chocolatey\lib\winflexbison3\tools\win_flex.exe C:\ProgramData\chocolatey\lib\winflexbison3\tools\flex.exe
-        cp C:\ProgramData\chocolatey\lib\winflexbison3\tools\win_bison.exe C:\ProgramData\chocolatey\lib\winflexbison3\tools\bison.exe
-
-    - name: Configure CMake
-      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build
-      run: cmake --build build --config Release
-
-    - name: Run Core Tests
+    # MSVC Setup
+    - name: Install dependencies (Windows MSVC)
+      if: matrix.os == 'windows-latest' && matrix.compiler == 'msvc'
       shell: bash
       run: |
-        cd build
-        ctest -C Release -L core --output-on-failure
+        choco install winflexbison3
+        echo "C:\\ProgramData\\chocolatey\\lib\\winflexbison3\\tools" >> $GITHUB_PATH
+        cp C:\\ProgramData\\chocolatey\\lib\\winflexbison3\\tools\\win_flex.exe C:\\ProgramData\\chocolatey\\lib\\winflexbison3\\tools\\flex.exe
+        cp C:\\ProgramData\\chocolatey\\lib\\winflexbison3\\tools\\win_bison.exe C:\\ProgramData\\chocolatey\\lib\\winflexbison3\\tools\\bison.exe
+
+    # MinGW Setup
+    - name: Set up MSYS2 (Windows MinGW)
+      if: matrix.compiler == 'mingw'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+          flex
+          bison
+
+    # Configure
+    - name: Configure CMake (MinGW)
+      if: matrix.compiler == 'mingw'
+      shell: msys2 {0}
+      run: cmake -G "MinGW Makefiles" -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw.cmake
+
+    - name: Configure CMake (Other)
+      if: matrix.compiler != 'mingw'
+      shell: bash
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    # Build
+    - name: Build (MinGW)
+      if: matrix.compiler == 'mingw'
+      shell: msys2 {0}
+      run: cmake --build build --config Release
+
+    - name: Build (Other)
+      if: matrix.compiler != 'mingw'
+      shell: bash
+      run: cmake --build build --config Release
+
+    # Tests
+    - name: Run Core Tests (MinGW)
+      if: matrix.compiler == 'mingw'
+      shell: msys2 {0}
+      run: cd build && ctest -C Release -L core --output-on-failure
+
+    - name: Run Core Tests (Other)
+      if: matrix.compiler != 'mingw'
+      shell: bash
+      run: cd build && ctest -C Release -L core --output-on-failure
+
+    # Artifacts
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: newt-${{ matrix.os }}-${{ matrix.compiler }}${{ matrix.exe-ext }}
+        path: |
+          build/newt
+          build/newt.exe
+          build/Release/newt.exe
+        if-no-files-found: ignore
