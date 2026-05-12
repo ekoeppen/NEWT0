@@ -28,6 +28,8 @@ jobs:
           - name: windows-msvc
             os: windows-latest
             compiler: msvc
+          - os: windows-latest
+            compiler: mingw
 
     steps:
     - uses: actions/checkout@v4
@@ -45,16 +47,28 @@ jobs:
       if: runner.os == 'macOS'
       run: brew install cmake flex bison
 
-    - name: Install dependencies (Windows)
-      if: runner.os == 'Windows'
+    - name: Install dependencies (Windows MSVC)
+      if: runner.os == 'Windows' && matrix.compiler == 'msvc'
       shell: bash
       run: |
         choco install winflexbison3
-        # winflexbison3 tools are in this directory
         echo "/c/ProgramData/chocolatey/lib/winflexbison3/tools" >> $GITHUB_PATH
         # Use the wrapper executables provided by the package which handle paths correctly
         cp /c/ProgramData/chocolatey/lib/winflexbison3/tools/win_flex.exe /c/ProgramData/chocolatey/lib/winflexbison3/tools/flex.exe
         cp /c/ProgramData/chocolatey/lib/winflexbison3/tools/win_bison.exe /c/ProgramData/chocolatey/lib/winflexbison3/tools/bison.exe
+ 
+    - name: Install dependencies (Windows MinGW)
+      if: matrix.compiler == 'mingw'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+          flex
+          bison
 
     - name: Configure CMake
       shell: bash
@@ -63,22 +77,41 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           ${{ matrix.toolchain && format('-DCMAKE_TOOLCHAIN_FILE={0}', matrix.toolchain) || '' }}
 
-    - name: Build
+    - name: Configure CMake (MinGW)
+      if: matrix.compiler == 'mingw'
+      shell: msys2 {0}
+      run: cmake -G "MinGW Makefiles" -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw.cmake
+
+    - name: Configure CMake (Other)
+      if: matrix.compiler != 'mingw'
+      shell: bash
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build (MinGW)
+      if: matrix.compiler == 'mingw'
+      shell: msys2 {0}
+      run: cmake --build build --config Release
+
+    - name: Build (Other)
+      if: matrix.compiler != 'mingw'
       shell: bash
       run: cmake --build build --config Release
 
-    - name: Run Core Tests
-      # Only run tests on native builds (not cross-compiles)
-      if: matrix.toolchain == ''
-      shell: bash
-      run: |
-        cd build
-        ctest -C Release -L core --output-on-failure
+    - name: Run Core Tests (MinGW)
+      if: matrix.compiler == 'mingw'
+      shell: msys2 {0}
+      run: cd build && ctest -C Release -L core --output-on-failure
 
+    - name: Run Core Tests (Other)
+      if: matrix.compiler != 'mingw'
+      shell: bash
+      run: cd build && ctest -C Release -L core --output-on-failure
+
+    # Artifacts
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: newt-${{ matrix.os }}-${{ matrix.compiler }}
+        name: newt-${{ matrix.os }}-${{ matrix.compiler }}${{ matrix.exe-ext }}
         path: |
           build/newt
           build/newt.exe
