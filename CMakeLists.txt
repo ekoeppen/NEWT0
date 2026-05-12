@@ -69,21 +69,29 @@ add_flex_bison_dependency(lexer parser)
 # ---- newt library ---------------------------------------------------------
 #
 
+if(MSVC)
+    set(PLATFORM_CONFIG_DIR src/newt_core/incs/msvc)
+elseif(MINGW)
+    set(PLATFORM_CONFIG_DIR src/newt_core/incs/mingw)
+elseif(APPLE)
+    set(PLATFORM_CONFIG_DIR src/newt_core/incs/darwin)
+else()
+    set(PLATFORM_CONFIG_DIR src/newt_core/incs/linux)
+endif()
+
 add_library(libnewt STATIC
 	${sources}
 	${headers}
 )
 
 target_include_directories(libnewt PUBLIC
-	$<$<PLATFORM_ID:Darwin>:  src/newt_core/incs/darwin >
-	$<$<PLATFORM_ID:Linux>:  src/newt_core/incs/linux >
-	$<$<PLATFORM_ID:Windows>: src/newt_core/incs/msvc >
+	${PLATFORM_CONFIG_DIR}
 	src/newt_core/incs/
 	src/parser/
 	src/
 )
 
-if(NOT WIN32)
+if(UNIX AND NOT APPLE AND NOT MINGW)
 	target_link_libraries(libnewt PUBLIC dl)
 endif()
 
@@ -104,9 +112,7 @@ install(DIRECTORY src/newt_core/incs/
 #
 add_executable(newt src/main.c)
 target_include_directories(newt PRIVATE
-	$<$<PLATFORM_ID:Darwin>:  src/newt_core/incs/darwin >
-	$<$<PLATFORM_ID:Linux>:  src/newt_core/incs/linux >
-	$<$<PLATFORM_ID:Windows>: src/newt_core/incs/msvc >
+	${PLATFORM_CONFIG_DIR}
 	src/newt_core/incs/
 	src/parser/
 	src/
