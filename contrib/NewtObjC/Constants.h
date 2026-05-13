@@ -39,11 +39,19 @@
 #define kNErrObjCRuntimeErr			(kNErrMiscBase - 3)	///< OK. Maybe change this.
 #define kNErrObjCExceptionName		NSSYM(evt.ex.objc;type.ref.frame.objcex)
 #define kNSExceptionObjCName		@"NewtonScriptException"
+#if __LP64__
+#define kObjCActionFuncTypeStr		"v24@0:8@16"
+#define kObjCDefaultFunc0TypeStr	"@16@0:8"
+#define kObjCDefaultFunc1TypeStr	kObjCActionFuncTypeStr
+#define kObjCDefaultFunc2TypeStr	"@32@0:8@16@24"
+#define kObjCDefaultFunc3TypeStr	"@40@0:8@16@24@32"
+#else
 #define kObjCActionFuncTypeStr		"v12@0:4@8"
 #define kObjCDefaultFunc0TypeStr	"@8@0:4"
 #define kObjCDefaultFunc1TypeStr	kObjCActionFuncTypeStr
 #define kObjCDefaultFunc2TypeStr	"@16@0:4@8@12"
 #define kObjCDefaultFunc3TypeStr	"@24@0:4@8@12@16"
+#endif
 #define kObjCNSFrameVarName			"_ns"
 #define kObjCNSFrameVarType			@encode(TNewtObjCRef*)
 #define kObjCOutletTypeStr			@encode(id)

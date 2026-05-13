@@ -43,6 +43,7 @@
 #include <objc/objc.h>
 #include <objc/objc-class.h>
 #include <objc/objc-runtime.h>
+#include <objc/message.h>
 #include <Foundation/Foundation.h>
 
 // NEWT/0
@@ -135,15 +136,16 @@ InstanceVariableExists(newtRef inRcvr, newtRef inName)
 }
 
 /**
- * Method of the ObjC object to call a NewtonScript-defined method.
+ * Method of the ObjC object to call a NewtonScript-defined method via forwardInvocation.
  */
-id
-GenericObjCMethod(id inSelf, SEL _cmd, ...)
+void
+GenericForwardInvocation(id inSelf, SEL _cmd, NSInvocation *invocation)
 {
+    SEL realCmd = [invocation selector];
 	newtRefVar theInstance = GetInstanceFrame(inSelf);
 
-	Method theObjCMethod = class_getInstanceMethod(object_getClass(inSelf), _cmd);
-	const char* theObjCMethodName = sel_getName(_cmd);
+	Method theObjCMethod = class_getInstanceMethod(object_getClass(inSelf), realCmd);
+	const char* theObjCMethodName = sel_getName(realCmd);
 
 	// Get the NewtonScript method.
 	char* theNSMethodName = ObjCNSNameTranslation(theObjCMethodName);
@@ -162,13 +164,32 @@ GenericObjCMethod(id inSelf, SEL _cmd, ...)
 		theIMPL = NcGetSlot(theIMPL, NSSYM(_proto));
 	}
 
-	id objCResult = NULL;
 	if (NewtRefIsNotNIL(theNSMethod))
 	{
-		va_list theStackArgs;	
-		va_start(theStackArgs, _cmd);
-		newtRefVar theArguments = CastParamsToNS(theStackArgs, theObjCMethod);
-		va_end(theStackArgs);
+        int nbArgs = method_getNumberOfArguments(theObjCMethod) - 2;
+        newtRefVar theArguments = NewtMakeArray(kNewtRefNIL, nbArgs);
+        for (int i = 0; i < nbArgs; i++) {
+            char* theType = method_copyArgumentType(theObjCMethod, i + 2);
+            char* theTypeCrsr = theType;
+            while (theTypeCrsr[0] == 'r') theTypeCrsr++;
+            
+            newtRefVar theParam = kNewtRefNIL;
+            switch (theTypeCrsr[0]) {
+                case '@': { id arg; [invocation getArgument:&arg atIndex:i+2]; theParam = CastIdToNS(arg); break; }
+                case '#': { Class arg; [invocation getArgument:&arg atIndex:i+2]; theParam = GetClassFromName(class_getName(arg)); break; }
+                case ':': { SEL arg; [invocation getArgument:&arg atIndex:i+2]; char* nsn = ObjCNSNameTranslation(sel_getName(arg)); theParam = NewtMakeSymbol(nsn); free(nsn); break; }
+                case 'c': case 'C': { char arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeCharacter(arg); break; }
+                case 's': case 'S': { short arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeInteger(arg); break; }
+                case 'i': case 'I': { int arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeInteger(arg); break; }
+                case 'l': case 'L': { long arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeInteger(arg); break; }
+                case 'q': case 'Q': { long long arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeInteger(arg); break; }
+                case 'f': { float arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeReal(arg); break; }
+                case 'd': { double arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeReal(arg); break; }
+                case '*': { char* arg; [invocation getArgument:&arg atIndex:i+2]; theParam = NewtMakeString(arg, false); break; }
+            }
+            free(theType);
+            NewtSetArraySlot(theArguments, i, theParam);
+        }
 
 		// Call the function.
 		newtRefVar theResult = NVMMessageSendWithArgArray(
@@ -185,8 +206,14 @@ GenericObjCMethod(id inSelf, SEL _cmd, ...)
 			[theObjCException raise];	// ciao.
 		}
 		
-		// Cast the result.
-		objCResult = CastResultToObjC(method_getTypeEncoding(theObjCMethod), theResult);
+        const char *retType = method_getTypeEncoding(theObjCMethod);
+        char* retTypeCrsr = (char*)retType;
+        while (retTypeCrsr[0] == 'r') retTypeCrsr++;
+        
+        if (retTypeCrsr[0] != 'v') {
+            id objCResult = CastResultToObjC(retTypeCrsr, theResult);
+            [invocation setReturnValue:&objCResult];
+        }
 	} else {
 		(void) NewtThrow(kNErrUndefinedMethod, theMethodSym);
 		newtRefVar theEx = NVMCurrentException();
@@ -194,8 +221,6 @@ GenericObjCMethod(id inSelf, SEL _cmd, ...)
 		NSException* theException = CastExToObjC(theEx);
 		[theException raise];	// ciao.
 	}
-	
-	return objCResult;
 }
 
 /**
@@ -799,7 +824,7 @@ CreateObjCMethods(
 				break;
 			}
 			
-            class_addMethod(ioClass, theMethodSEL, (IMP) GenericObjCMethod, method_getTypeEncoding(theOriginalMethod));
+            class_addMethod(ioClass, theMethodSEL, _objc_msgForward, method_getTypeEncoding(theOriginalMethod));
 		} else {
 			// I need the type (from the function definition).
 			newtRef value = NewtGetFrameSlot(inMethods, indexMethods);
@@ -807,7 +832,7 @@ CreateObjCMethods(
 			if (NewtRefIsString(theType))
 			{
 				const char* theTypeString = NewtRefToString(theType);
-				class_addMethod(ioClass, theMethodSEL, (IMP) GenericObjCMethod, theTypeString);
+				class_addMethod(ioClass, theMethodSEL, _objc_msgForward, theTypeString);
 			} else {
 				// Use the default type.
 				const char* theTypeString;
@@ -825,10 +850,12 @@ CreateObjCMethods(
 					// XXX Cleanup
 					break;
 				}
-				class_addMethod(ioClass, theMethodSEL, (IMP) GenericObjCMethod, theTypeString);
+				class_addMethod(ioClass, theMethodSEL, _objc_msgForward, theTypeString);
 			}
 		}
 	}
+
+    class_addMethod(ioClass, @selector(forwardInvocation:), (IMP) GenericForwardInvocation, "v@:@");
 
 	// Add the initialize, alloc & allocWithZone class method
 	if (isMetaClass)
